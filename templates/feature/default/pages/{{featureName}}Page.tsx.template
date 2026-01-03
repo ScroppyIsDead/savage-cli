@@ -1,0 +1,19 @@
+import React from "react";
+
+export function {{featureName}}Page() {
+  return (
+    <section className="min-h-screen bg-slate-900 text-slate-100 p-8 flex flex-col justify-center">
+      <div className="max-w-2xl mx-auto space-y-4">
+        <h1 className="text-4xl font-bold tracking-tight">
+          Tailwind-ready {{featureName}} Feature
+        </h1>
+        <p className="text-lg text-slate-300">
+          This template assumes Tailwind classes are available. Remove the
+          placeholder styles once you wire your real UI.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+export default {{featureName}}Page;

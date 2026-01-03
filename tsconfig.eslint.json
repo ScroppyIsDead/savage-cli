@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src",
+    "features",
+    "templates",
+    "core",
+    "tests",
+    ".eslint-plugins",
+    "tooling",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "eslint.config.js"
+  ],
+  "compilerOptions": {
+    "allowJs": true
+  }
+}
