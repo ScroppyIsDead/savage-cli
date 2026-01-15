@@ -17,7 +17,7 @@ export default [
     "eslint:recommended",
     "plugin:react/recommended",
     "plugin:@typescript-eslint/recommended",
-    "prettier"
+    "prettier",
   ),
   ...compat.env({
     browser: true,
@@ -53,13 +53,12 @@ export default [
         { argsIgnorePattern: "^_" },
       ],
       "route-paths/no-duplicate-route-paths": "error",
+      "route-paths/no-cross-feature-imports": "error",
+      "react/prop-types": "off",
     },
   },
   {
-    files: [
-      ".eslint-plugins/**/*",
-      "tooling/**/*",
-    ],
+    files: [".eslint-plugins/**/*", "tooling/**/*"],
     rules: {
       "@typescript-eslint/no-require-imports": "off",
     },

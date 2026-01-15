@@ -116,20 +116,24 @@ function collectRoutes(routes, featureName, summary, routeMap, nameMap) {
 }
 
 function loadRoutesModule(routesPath) {
+  const tsconfigPath = fs.existsSync(path.resolve("tsconfig.app.json"))
+    ? path.resolve("tsconfig.app.json")
+    : path.resolve("tsconfig.json");
+
   const result = esbuild.buildSync({
-    entryPoints: [routesPath],
-    bundle: true,
-    format: "cjs",
-    platform: "node",
-    target: ["node18"],
-    write: false,
-    absWorkingDir: path.dirname(routesPath),
-    sourcemap: "inline",
-    tsconfig: path.resolve("tsconfig.json"),
-    loader: {
-      ".ts": "ts",
-      ".tsx": "tsx"
-    },
+      entryPoints: [routesPath],
+      bundle: true,
+      format: "cjs",
+      platform: "node",
+      target: ["node18"],
+      write: false,
+      absWorkingDir: path.dirname(routesPath),
+      sourcemap: "inline",
+      tsconfig: tsconfigPath,
+      loader: {
+        ".ts": "ts",
+        ".tsx": "tsx"
+      },
     logLevel: "silent"
   });
 
@@ -176,10 +180,119 @@ function detectFeatures() {
   return fs.readdirSync(featuresRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory());
 }
 
+function validateCaseSensitivePath(resolvedPath) {
+  // Handle both absolute and relative paths correctly on Windows and Unix
+  const parsed = path.parse(resolvedPath);
+  const isAbsolute = path.isAbsolute(resolvedPath);
+  
+  // Start from root for absolute paths, current directory for relative
+  let base = isAbsolute ? parsed.root : path.resolve(".");
+  
+  // Extract directory path relative to root (handles Windows drive letters correctly)
+  const dirPath = isAbsolute 
+    ? parsed.dir.slice(parsed.root.length) 
+    : parsed.dir;
+  
+  // Split into parts, filtering out empty strings
+  const parts = dirPath ? dirPath.split(path.sep).filter(Boolean) : [];
+  
+  // Add filename to parts if present
+  if (parsed.base) {
+    parts.push(parsed.base);
+  }
+  
+  // Walk through each part and verify case-sensitive existence
+  for (const part of parts) {
+    try {
+      const entries = fs.readdirSync(base);
+      // Check if the exact case-sensitive name exists
+      if (!entries.includes(part)) {
+        return null;
+      }
+      base = path.join(base, part);
+    } catch {
+      // If we can't read the directory, the path is invalid
+      return null;
+    }
+  }
+  
+  return base;
+}
+
+function lazyImportExists(featureName, lazyImport) {
+  if (!lazyImport) return false;
+  const normalizedImport = lazyImport.replace(/^\.\//, "");
+  const candidates = [
+    path.join(featuresRoot, featureName, normalizedImport),
+    path.resolve(normalizedImport),
+    path.resolve(normalizedImport.replace(/^\.\/+/, "")),
+  ];
+  for (const candidate of candidates) {
+    if (!fs.existsSync(candidate)) continue;
+    const resolved = validateCaseSensitivePath(candidate);
+    if (resolved) return candidate;
+  }
+  return false;
+}
+
+function checkLazyImports(routes, featureName, missing, routesPath, parentName = "") {
+  for (const route of routes) {
+    if (!route) continue;
+    const lazyImport = route.lazyImport || route.handle?.lazyImport;
+    const resolved = lazyImport && lazyImportExists(featureName, lazyImport);
+    if (lazyImport && !resolved) {
+      missing.push({
+        feature: featureName,
+        routeName: route.name ?? parentName ?? route.path ?? "unnamed",
+        path: route.path,
+        lazyImport,
+        routesPath,
+      });
+    }
+    if (Array.isArray(route.children)) {
+      checkLazyImports(route.children, featureName, missing, routesPath, route.name);
+    }
+  }
+}
+
+function checkPrefetchImports(
+  routes,
+  featureName,
+  missing,
+  routesPath,
+  parentName = ""
+) {
+  for (const route of routes) {
+    if (!route) continue;
+    const routeName = route.name ?? parentName ?? route.path ?? "unnamed";
+    const prefetchPaths = route.handle?.prefetch ?? route.prefetch;
+    if (Array.isArray(prefetchPaths)) {
+      for (const prefetchPath of prefetchPaths) {
+        if (!prefetchPath) continue;
+        const resolved = lazyImportExists(featureName, prefetchPath);
+        if (!resolved) {
+          missing.push({
+            feature: featureName,
+            routeName,
+            path: route.path,
+            prefetchPath,
+            routesPath,
+          });
+        }
+      }
+    }
+    if (Array.isArray(route.children)) {
+      checkPrefetchImports(route.children, featureName, missing, routesPath, routeName);
+    }
+  }
+}
+
 function analyzeRoutes() {
   const summary = [];
   const routeMap = new Map();
   const nameMap = new Map();
+  const missingLazyImports = [];
+  const missingPrefetchImports = [];
 
   for (const entry of detectFeatures()) {
     const featureName = entry.name;
@@ -196,6 +309,13 @@ function analyzeRoutes() {
       routePrefix: moduleExports.routePrefix ?? config.routePrefix ?? featureName,
       routes: routeDefinitions
     };
+    checkLazyImports(descriptor.routes, featureName, missingLazyImports, routesPath);
+    checkPrefetchImports(
+      descriptor.routes,
+      featureName,
+      missingPrefetchImports,
+      routesPath
+    );
 
     const finalRoutes = groupRoutesByPrefix(descriptor);
     collectRoutes(finalRoutes, featureName, summary, routeMap, nameMap);
@@ -223,9 +343,78 @@ function analyzeRoutes() {
     }
   }
 
-  return { summary, duplicates, nameDuplicates };
+  return {
+    summary,
+    duplicates,
+    nameDuplicates,
+    missingLazyImports,
+    missingPrefetchImports,
+  };
+}
+
+function buildManifestRoute(route) {
+  const manifestEntry = {};
+  if (route.path !== undefined) {
+    manifestEntry.path = route.path;
+  }
+  if (route.name !== undefined) {
+    manifestEntry.name = route.name;
+  }
+  if (route.index) {
+    manifestEntry.index = true;
+  }
+  if (route.caseSensitive) {
+    manifestEntry.caseSensitive = true;
+  }
+    if (route.handle) {
+      const handleEntry = {};
+      if (route.handle.lazyImport) {
+        handleEntry.lazyImport = route.handle.lazyImport;
+      }
+      if (route.handle.skipLazy) {
+        handleEntry.skipLazy = true;
+      }
+      if (route.handle.policies) {
+        handleEntry.policies = route.handle.policies;
+      }
+      if (route.handle.prefetch) {
+        handleEntry.prefetch = route.handle.prefetch;
+      }
+      if (Object.keys(handleEntry).length) {
+        manifestEntry.handle = handleEntry;
+      }
+    }
+  if (Array.isArray(route.children) && route.children.length > 0) {
+    manifestEntry.children = route.children.map(buildManifestRoute);
+  }
+  return manifestEntry;
+}
+
+function generateRouteManifest() {
+  const manifest = [];
+
+  for (const entry of detectFeatures()) {
+    const featureName = entry.name;
+    const routesPath = path.join(featuresRoot, featureName, "routes.tsx");
+    if (!fs.existsSync(routesPath)) continue;
+
+    const moduleExports = loadRoutesModule(routesPath);
+    const config = readFeatureConfig(featureName);
+    const routeDefinitions = toRouteArray(moduleExports.routes ?? moduleExports.default);
+    if (!routeDefinitions.length) continue;
+
+    manifest.push({
+      name: featureName,
+      routePrefix: moduleExports.routePrefix ?? config.routePrefix ?? featureName,
+      config,
+      routes: routeDefinitions.map(buildManifestRoute),
+    });
+  }
+
+  return manifest;
 }
 
 module.exports = {
-  analyzeRoutes
+  analyzeRoutes,
+  generateRouteManifest,
 };

@@ -1,30 +1,36 @@
-import React, { ReactNode, useEffect } from "react";
-import TelemetryGuard, { TelemetryMetadata } from "./TelemetryGuard";
+import { useEffect } from "react";
+import type { ReactNode } from "react";
+import TelemetryGuard from "./TelemetryGuard";
+import type { TelemetryMetadata } from "./TelemetryGuard";
+import { schedulePrefetch, type PrefetchEntry } from "./prefetchScheduler";
 
 type HookModule = Record<string, unknown>;
-type ModuleMap = Record<string, HookModule>;
+type ModuleLoader = () => Promise<HookModule>;
 
-const initModules = import.meta.glob("../../../features/*/hooks/init.ts", { eager: true }) as ModuleMap;
-const cleanupModules = import.meta.glob("../../../features/*/hooks/cleanup.ts", { eager: true }) as ModuleMap;
+const initModules = import.meta.glob(
+  "../../../features/*/hooks/init.ts",
+) as Record<string, ModuleLoader>;
+const cleanupModules = import.meta.glob(
+  "../../../features/*/hooks/cleanup.ts",
+) as Record<string, ModuleLoader>;
 
-function resolveModule(modules: ModuleMap, featureName: string, suffix: string): HookModule | undefined {
-  const entry = Object.entries(modules).find(([key]) => key.includes(`features/${featureName}/${suffix}`));
-  return entry ? entry[1] : undefined;
-}
-
-function getHookFunction(module: HookModule | undefined, exportName: string): (() => unknown) | undefined {
+function getHookFunction(
+  module: HookModule | undefined,
+  exportName: string,
+): (() => unknown) | undefined {
   if (!module) return undefined;
   const candidate = module[exportName];
   if (typeof candidate === "function") return candidate as () => unknown;
   const defaultExport = module.default;
-  if (typeof defaultExport === "function") return defaultExport as () => unknown;
+  if (typeof defaultExport === "function")
+    return defaultExport as () => unknown;
   return undefined;
 }
 
 function PolicyGuard({
   featureName,
   policies,
-  children
+  children,
 }: {
   featureName: string;
   policies?: Record<string, unknown>;
@@ -37,7 +43,10 @@ function PolicyGuard({
   }, [featureName, policies]);
 
   return (
-    <div data-feature={featureName} data-policies={policies ? JSON.stringify(policies) : undefined}>
+    <div
+      data-feature={featureName}
+      data-policies={policies ? JSON.stringify(policies) : undefined}
+    >
       {children}
     </div>
   );
@@ -47,24 +56,18 @@ export default function FeatureRuntimeWrapper({
   featureName,
   policies,
   routeMetadata,
-  children
+  prefetchEntries,
+  children,
 }: {
   featureName: string;
   policies?: Record<string, unknown>;
   routeMetadata?: TelemetryMetadata;
+  prefetchEntries?: PrefetchEntry[];
   children: ReactNode;
 }) {
   useEffect(() => {
-    const initModule = resolveModule(initModules, featureName, "hooks/init.ts");
-    const cleanupModule = resolveModule(cleanupModules, featureName, "hooks/cleanup.ts");
-    const initFn = getHookFunction(initModule, "init");
-    const cleanupFn = getHookFunction(cleanupModule, "cleanup");
-
-    if (initFn) initFn();
-    return () => {
-      if (cleanupFn) cleanupFn();
-    };
-  }, [featureName]);
+    schedulePrefetch(prefetchEntries);
+  }, [prefetchEntries]);
 
   return (
     <TelemetryGuard
@@ -74,7 +77,7 @@ export default function FeatureRuntimeWrapper({
         routePath: routeMetadata?.routePath,
         featureVersion: routeMetadata?.featureVersion,
         policies,
-        overrideKey: routeMetadata?.overrideKey
+        overrideKey: routeMetadata?.overrideKey,
       }}
     >
       <PolicyGuard featureName={featureName} policies={policies}>
@@ -82,4 +85,43 @@ export default function FeatureRuntimeWrapper({
       </PolicyGuard>
     </TelemetryGuard>
   );
+}
+
+function useFeatureLifecycle(featureName: string) {
+  useEffect(() => {
+    let cleanupFn: (() => void) | undefined;
+
+    const load = async () => {
+      const initLoader =
+        initModules[`../../../features/${featureName}/hooks/init.ts`];
+      const cleanupLoader =
+        cleanupModules[`../../../features/${featureName}/hooks/cleanup.ts`];
+
+      if (initLoader) {
+        const mod = await initLoader();
+        const fn = getHookFunction(mod, "init");
+        fn?.();
+      }
+
+      if (cleanupLoader) {
+        const mod = await cleanupLoader();
+        cleanupFn = getHookFunction(mod, "cleanup");
+      }
+    };
+
+    load();
+
+    return () => cleanupFn?.();
+  }, [featureName]);
+}
+
+export function FeatureLifecycleScope({
+  featureName,
+  children,
+}: {
+  featureName: string;
+  children: ReactNode;
+}) {
+  useFeatureLifecycle(featureName);
+  return <>{children}</>;
 }

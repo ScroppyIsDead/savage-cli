@@ -1,17 +1,26 @@
-import React from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import App from "./App";
+import "./index.css";
+import { renderFullApp } from "./entries/fullApp";
 
-import "./styles.css";
-import { TelemetryLoggerProvider } from "./core/routing/TelemetryGuard";
+const root = createRoot(document.getElementById("root")!);
+renderFullApp(root);
 
-createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <TelemetryLoggerProvider>
-        <App />
-      </TelemetryLoggerProvider>
-    </BrowserRouter>
-  </React.StrictMode>
-);
+const splash = document.getElementById("initial-loading");
+if (splash) {
+  const finish = () => {
+    splash.classList.add("initial-loading--fade");
+    splash.addEventListener(
+      "transitionend",
+      () => {
+        splash.remove();
+      },
+      { once: true },
+    );
+  };
+
+  if (document.readyState === "complete") {
+    finish();
+  } else {
+    window.addEventListener("load", finish, { once: true });
+  }
+}

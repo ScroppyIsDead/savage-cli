@@ -1,1 +1,5 @@
-export { default as RouteLink, useRouteByName, resolveRoutePath } from "./RouteLink";
+export {
+  default as RouteLink,
+  useRouteByName,
+  resolveRoutePath,
+} from "./RouteLink";

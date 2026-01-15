@@ -1,10 +1,5 @@
-import {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useMemo,
-} from "react";
+import { createContext, useContext, useEffect, useMemo } from "react";
+import type { ReactNode } from "react";
 
 export interface TelemetryMetadata {
   featureName: string;
@@ -54,7 +49,7 @@ export function useFeatureTelemetry(): TelemetryMetadata {
   const context = useContext(TelemetryContext);
   if (!context) {
     throw new Error(
-      "`useFeatureTelemetry` must be called inside a <TelemetryGuard>."
+      "`useFeatureTelemetry` must be called inside a <TelemetryGuard>.",
     );
   }
   return context;
@@ -77,7 +72,7 @@ export default function TelemetryGuard({
       metadata.featureVersion ?? "",
       metadata.overrideKey ?? "",
       JSON.stringify(metadata.policies ?? {}),
-    ]
+    ],
   );
 
   useEffect(() => {

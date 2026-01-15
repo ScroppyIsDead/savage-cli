@@ -1,1 +1,0 @@
-export { {{featureName}}Page } from "../pages/{{featureName}}Page";

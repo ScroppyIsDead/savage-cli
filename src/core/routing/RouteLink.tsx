@@ -1,5 +1,5 @@
 import { Link, type LinkProps } from "react-router-dom";
-import { getRoutePathByName } from "./featureRegistry";
+import { getRoutePathByName } from "../../routes/routes.generated";
 
 type RouteLinkPropsBase = Omit<LinkProps, "to">;
 
@@ -24,9 +24,13 @@ export default function RouteLink(props: RouteLinkProps) {
     const { name, ...rest } = props;
     const routePath = getRoutePathByName(name);
     if (!routePath) {
-      console.warn(`Route name "${name}" not registered`);
+      const message = `RouteLink sent route name "${name}" that is not registered. Check that the corresponding feature exports that route.`;
+      if (import.meta.env.DEV) {
+        console.error(message);
+      }
+      throw new Error(message);
     }
-    return <Link to={routePath ?? name} {...rest} />;
+    return <Link to={routePath} {...rest} />;
   }
 
   const { toPath, ...rest } = props;

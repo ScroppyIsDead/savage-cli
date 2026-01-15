@@ -2,7 +2,8 @@
 
 import routeInspector from "./route-inspector.cjs";
 
-const { summary, duplicates, nameDuplicates } = routeInspector.analyzeRoutes();
+const { summary, duplicates, nameDuplicates, missingLazyImports } =
+  routeInspector.analyzeRoutes();
 
 if (!summary.length) {
   console.log(
@@ -33,6 +34,16 @@ if (nameDuplicates.length) {
   for (const conflict of nameDuplicates) {
     console.error(
       `- Name "${conflict.name}" is declared by ${conflict.paths.join(", ")}`
+    );
+  }
+}
+
+if (missingLazyImports.length) {
+  failed = true;
+  console.error("Missing lazy import references detected:");
+  for (const entry of missingLazyImports) {
+    console.error(
+      `- Feature ${entry.feature} route ${entry.routeName} (${entry.path}) references missing lazyImport ${entry.lazyImport} (defined in ${entry.routesPath})`
     );
   }
 }
