@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { RouteLink } from "@savage-cli/routing";
 import {
   clearUserName,
   getStoredUserName,
@@ -93,7 +93,10 @@ export default function LoginPage() {
             </strong>
           </p>
           <p className="mt-2">
-            Jump to the <Link className="text-blue-300" to="/todo">todo board</Link>{" "}
+            Jump to the{" "}
+            <RouteLink name="todo.board" className="text-blue-300 underline">
+              todo board
+            </RouteLink>{" "}
             to test the shared exports.
           </p>
         </div>

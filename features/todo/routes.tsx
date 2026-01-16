@@ -11,5 +11,8 @@ export const routes = defineFeatureRoutes("todo", [
       auth: "optional",
       cache: "no-store",
     },
+    handle: {
+      prefetch: ["../user/pages/LoginPage.tsx"],
+    },
   },
 ]);

@@ -25,6 +25,12 @@ Please remember to change this readme.md file into whatever it is your feature d
 - Central Redux lives in `src/features/store.ts`, which imports reducers from each feature so `AppDispatch` and `RootState` are globally available.
 - Features should gate API calls and state updates through public thunks/selectors (e.g., `loginThunk`, `selectIsAuthenticated`), even if only local pages consume them now; the contract stays stable and lets other features import them later without tight coupling.
 
+## This feature
+
+- `/user` renders a login stub at `features/user/pages/LoginPage.tsx` that writes a simple `name` into local storage, exposes helper functions from `features/user/public/index.ts`, and uses `RouteLink` for navigation so routes can be renamed safely.
+- The route definition now attaches `handle.prefetch: ["../todo/pages/TodoPage.tsx"]` so React can warm up the todo bundle while the user profile loads.
+- Public APIs: `getStoredUserName`, `saveUserName`, `clearUserName`, plus the init/cleanup hooks exported via `public/hooks/index.ts`.
+
 ## Templates & tooling
 
 - When the CLI builds the global route map, it reads `feature.config` plus the `routes.tsx` file and injects every feature under `/features/<prefix>`.

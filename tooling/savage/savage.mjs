@@ -159,15 +159,6 @@ async function spawnCommand(commandName, args) {
   });
 }
 
-async function writeConfig(feature, config) {
-  const configPath = path.join(featureDir, feature, "feature.config");
-  await writeFile(
-    configPath,
-    yaml.dump(config, { lineWidth: -1, noRefs: true }),
-    "utf8"
-  );
-}
-
 async function run() {
   switch (command) {
     case "generate": {
@@ -297,14 +288,16 @@ async function run() {
       const targetFeatures = positional[0]
         ? [positional[0]]
         : Array.from(configCache.keys());
-      const missing = targetFeatures.filter((feature) => !configCache.has(feature));
+      const missing = targetFeatures.filter(
+        (feature) => !configCache.has(feature)
+      );
       if (missing.length) {
         throw new Error(`Feature not found: ${missing.join(", ")}`);
       }
       console.log(
         `Features checked: ${targetFeatures.join(
-          ", ",
-        )}. Export/import contracts are enforced via ESLint (run \`npm run lint\`).`,
+          ", "
+        )}. Export/import contracts are enforced via ESLint (run \`npm run lint\`).`
       );
       break;
     }

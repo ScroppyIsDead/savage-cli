@@ -13,35 +13,38 @@ const compat = new FlatCompat({
 });
 
 export default [
+  {
+    ignores: ["dist/**"],
+  },
+
   ...compat.extends(
     "eslint:recommended",
     "plugin:react/recommended",
     "plugin:@typescript-eslint/recommended",
-    "prettier",
+    "prettier"
   ),
+
   ...compat.env({
     browser: true,
     es2024: true,
     node: true,
   }),
+
   {
-    ignores: ["node_modules/**", "dist/**"],
+    files: ["src/**/*", "features/**/*"],
+    ignores: ["node_modules/**"],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
         ecmaVersion: "latest",
         sourceType: "module",
-        ecmaFeatures: {
-          jsx: true,
-        },
+        ecmaFeatures: { jsx: true },
         tsconfigRootDir: path.resolve("."),
         project: ["./tsconfig.eslint.json"],
       },
     },
     settings: {
-      react: {
-        version: "detect",
-      },
+      react: { version: "detect" },
     },
     plugins: {
       "route-paths": routePathsPlugin,
@@ -57,6 +60,7 @@ export default [
       "react/prop-types": "off",
     },
   },
+
   {
     files: [".eslint-plugins/**/*", "tooling/**/*"],
     rules: {

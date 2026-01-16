@@ -1,12 +1,12 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { RouteLink } from "@savage-cli/routing";
+import { getStoredUserName } from "../../user/public";
 import {
   createTodoItem,
   getStoredTodos,
   persistTodos,
-  TodoItem,
 } from "../public";
-import { getStoredUserName } from "../../user/public";
+import type { TodoItem } from "../public";
 
 export default function TodoPage() {
   const [todos, setTodos] = useState<TodoItem[]>([]);
@@ -58,12 +58,12 @@ export default function TodoPage() {
             <h1 className="text-3xl font-semibold text-white">
               Local storage board
             </h1>
-            <Link
-              to="/user"
+            <RouteLink
+              name="user.login"
               className="rounded-full border border-slate-700/80 px-3 py-1 text-xs uppercase tracking-[0.4em] text-blue-300"
             >
               Edit user
-            </Link>
+            </RouteLink>
           </div>
           <p className="text-sm text-slate-400">
             {owner} · {completed}/{total} done
