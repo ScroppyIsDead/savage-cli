@@ -226,22 +226,14 @@ function createElementWrapper(
 ) {
   const loader = resolveLoader(descriptor.name, route.handle?.lazyImport);
   const fallback = route.handle?.loadingFallback ?? <LoadingFallback />;
-
-  const metadata = {
-    featureName: descriptor.name,
-    routeName,
-    routePath: route.path,
-    featureVersion: descriptor.config?.version,
-    policies: route.handle?.policies ?? descriptor.config?.policies,
-  };
+  const policies = route.handle?.policies ?? descriptor.config?.policies;
 
   if (loader) {
     const LazyComponent = lazy(() => loader());
     const wrapped = (
       <FeatureRuntimeWrapper
         featureName={descriptor.name}
-        policies={metadata.policies}
-        routeMetadata={metadata}
+        policies={policies}
         prefetchEntries={prefetchEntries}
       >
         <LazyComponent />
@@ -255,8 +247,7 @@ function createElementWrapper(
     return (
       <FeatureRuntimeWrapper
         featureName={descriptor.name}
-        policies={metadata.policies}
-        routeMetadata={metadata}
+        policies={policies}
         prefetchEntries={prefetchEntries}
       >
         {route.element as ReactElement}

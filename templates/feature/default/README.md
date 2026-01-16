@@ -21,7 +21,7 @@ Please remember to change this readme.md file into whatever it is your feature d
 
 ## Behavior
 
-- Shared utilities (`apiWrapper`, `appConfig`, routing helpers) live in `src/core/*` and are exported through `@savage-cli/core`, so feature code can marshal requests and telemetry without rewriting plumbing.
+- Shared utilities (`apiWrapper`, `appConfig`, routing helpers) live in `src/core/*` and are exported through `@savage-cli/core`, so feature code can marshal requests and instrumentation without rewriting plumbing.
 - Central Redux lives in `src/features/store.ts`, which imports reducers from each feature so `AppDispatch` and `RootState` are globally available.
 - Features should gate API calls and state updates through public thunks/selectors (e.g., `loginThunk`, `selectIsAuthenticated`), even if only local pages consume them now; the contract stays stable and lets other features import them later without tight coupling.
 

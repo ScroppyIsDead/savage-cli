@@ -218,14 +218,6 @@ function wrapRoutes(
         <FeatureRuntimeWrapper
           featureName={descriptor.name}
           policies={descriptor.config.policies}
-          routeMetadata={{
-            featureName: descriptor.name,
-            routeName:
-              normalizedRoute.handle?.routeName ?? `${descriptor.name}.route`,
-            routePath: normalizedRoute.path,
-            featureVersion: descriptor.config.version,
-            policies: descriptor.config.policies,
-          }}
         >
           {finalElement}
         </FeatureRuntimeWrapper>
@@ -234,14 +226,6 @@ function wrapRoutes(
           <LazyFeatureRuntimeWrapper
             featureName={descriptor.name}
             policies={descriptor.config.policies}
-            routeMetadata={{
-              featureName: descriptor.name,
-              routeName:
-                normalizedRoute.handle?.routeName ?? `${descriptor.name}.route`,
-              routePath: normalizedRoute.path,
-              featureVersion: descriptor.config.version,
-              policies: descriptor.config.policies,
-            }}
           >
             {finalElement}
           </LazyFeatureRuntimeWrapper>

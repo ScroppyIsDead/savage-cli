@@ -47,7 +47,7 @@ routes:
     component: ./pages/Help.tsx
     layout: shared/Layout.tsx
     lazy: true
-    guards: [auth, telemetry]
+    guards: [auth]
     policies:
       auth: strong
   - name: support.contact
@@ -66,12 +66,11 @@ policies:
   auth: strong          # guard wrappers (strong, optional, public-only, etc.)
   cache: no-store       # service worker or header hints
   chunkHint: feature    # bundler chunking preference (feature | shared | inline)
-  telemetryContext: auth#login
-  rateLimit: soft       # optional descriptor passed to observability/logging
+  rateLimit: soft       # optional descriptor passed to middleware/logging
 ```
 
-- Policies stay next to the feature so tooling can inject guards, headers, and telemetry tags automatically.
-- Treat those values as lightweight middleware hints: `auth: strong` can drive guard logic, `cache: no-store` can flip headers, and `telemetryContext` tags what gets emitted to your observability stack. Attach per-route `policies` through `defineFeatureRoutes` when you need overrides, and guards/`useFeatureTelemetry()` will still see the current values.
+- Policies stay next to the feature so tooling can inject guards and headers automatically.
+- Treat those values as lightweight middleware hints: `auth: strong` can drive guard logic and `cache: no-store` can flip headers. Attach per-route `policies` through `defineFeatureRoutes` when you need overrides so the same metadata flows through your middleware.
 - Define absolute paths (e.g. `path: "/info"`) directly in your routes to escape the feature prefix; the registry handles them without a shared overrides file.
 
 ## Versions & checks

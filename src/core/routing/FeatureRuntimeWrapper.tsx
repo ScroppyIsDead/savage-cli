@@ -1,7 +1,5 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
-import TelemetryGuard from "./TelemetryGuard";
-import type { TelemetryMetadata } from "./TelemetryGuard";
 import { schedulePrefetch, type PrefetchEntry } from "./prefetchScheduler";
 
 type HookModule = Record<string, unknown>;
@@ -55,13 +53,11 @@ function PolicyGuard({
 export default function FeatureRuntimeWrapper({
   featureName,
   policies,
-  routeMetadata,
   prefetchEntries,
   children,
 }: {
   featureName: string;
   policies?: Record<string, unknown>;
-  routeMetadata?: TelemetryMetadata;
   prefetchEntries?: PrefetchEntry[];
   children: ReactNode;
 }) {
@@ -70,20 +66,9 @@ export default function FeatureRuntimeWrapper({
   }, [prefetchEntries]);
 
   return (
-    <TelemetryGuard
-      metadata={{
-        featureName,
-        routeName: routeMetadata?.routeName ?? `${featureName}.route`,
-        routePath: routeMetadata?.routePath,
-        featureVersion: routeMetadata?.featureVersion,
-        policies,
-        overrideKey: routeMetadata?.overrideKey,
-      }}
-    >
-      <PolicyGuard featureName={featureName} policies={policies}>
-        {children}
-      </PolicyGuard>
-    </TelemetryGuard>
+    <PolicyGuard featureName={featureName} policies={policies}>
+      {children}
+    </PolicyGuard>
   );
 }
 

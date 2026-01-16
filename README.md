@@ -6,9 +6,9 @@ Savage is a feature-first React framework inspired by Django’s file-backed con
 
 - **Feature-first directories**: Place UI, hooks, routes, public exports, tests, and metadata inside `features/<featureName>` so everything the feature owns is in one place.
 - **Contract-first sharing**: Each feature publishes a `feature.config` containing versioned public exports, lifecycle hooks, policies, routes, and dependencies. Imports across features are validated against those contracts.
-- **File-driven routing**: A single `featureRegistry` aggregates every feature’s `routes.tsx`, wraps each route with `FeatureRuntimeWrapper`/`TelemetryGuard`, and produces a React Router tree augmented with policies and telemetry metadata so there are no implicit routes.
+- **File-driven routing**: A single `featureRegistry` aggregates every feature’s `routes.tsx`, wraps each route with `FeatureRuntimeWrapper`, and produces a React Router tree augmented with policy metadata so there are no implicit routes.
 - **CLI automation**: `tooling/savage` contains the CLI entrypoint plus scaffolding helpers that let you generate apps, features, run diagnostics, and verify contracts from the terminal.
-- **Telemetry**: The runtime logs mount/unmount events per feature/route, and you can remap or rename a route by defining an absolute path (`path: "/demo/info"`) or by updating the feature’s `routes.tsx`; there’s no extra overrides file to maintain.
+- **Observability hooks**: Routes still capture policy metadata so you can hook your own logging or instrumentation around `FeatureRuntimeWrapper`, but the framework does not ship with a default telemetry pipeline.
 
 ## Table of Contents
 
@@ -42,7 +42,7 @@ npm run savage -- generate payments --template=tailwind
 npm run dev
 ```
 
-4. Navigate the app via the routes declared inside `features/`; telemetry information will show up in console logs (or your custom telemetry logger if you provide one).
+4. Navigate the app via the routes declared inside `features/`; wrap `FeatureRuntimeWrapper` yourself if you want to emit lifecycle or telemetry-related console output.
 
 ## Project Layout
 
@@ -51,9 +51,9 @@ npm run dev
 - `routes.tsx`: The feature-specific router. Export a `routePrefix` string plus your `RouteObject[]`; the registry mounts that array under the prefix (a Django-like namespace) while still letting you declare relative child paths.
   - `public/`: Re-exported APIs other features can consume.
   - `tests/`: Feature-local test suite (picked up by `savage test`).
-- `src/core/routing`: Runtime helpers that build the route map, wrap routes with lifecycle/policy guards, and provide providers for telemetry/middleware.
+- `src/core/routing`: Runtime helpers that build the route map, wrap routes with lifecycle/policy guards, and provide providers for instrumentation/middleware.
 - `src/routes/featureRoutes.tsx`: The central route map that loads dynamic feature routes, handles redirects, and renders the custom 404 page.
-- `src/core/routing/routeHelpers.ts`: Provides `defineFeatureRoutes(featureName, definitions)` so a feature file only lists each path/lazy import, and the helper wires names, handles, and telemetry defaults automatically. Declare absolute child paths (like `/info`) when you need to escape the feature prefix instead of managing a separate override map.
+- `src/core/routing/routeHelpers.ts`: Provides `defineFeatureRoutes(featureName, definitions)` so a feature file only lists each path/lazy import, and the helper wires names, handles, and metadata defaults automatically. Declare absolute child paths (like `/info`) when you need to escape the feature prefix instead of managing a separate override map.
 - `tooling/savage/`: CLI scripts for generating apps/features, running diagnostics, and keeping templates/defaults in sync.
 - `.cache/savage`: Stores defaults and contract snapshots.
 
@@ -66,17 +66,17 @@ Every `feature.config` includes:
 - `public.exports`: shareable exports (components, hooks, utilities).
 - `public.hooks`: `init`, `cleanup`, guard hooks invoked by `FeatureRuntimeWrapper`.
 - `routes`: optional overrides for `path`, `layout`, `policies`, `guards`.
-- `policies`: runtime hints (`auth`, `cache`, `chunkHint`, `telemetryContext`, `rateLimit`).
+- `policies`: runtime hints (`auth`, `cache`, `chunkHint`, `rateLimit`).
 
 The CLI enforces these contracts:
 
-- `savage check` verifies imports only touch declared exports, optionally auto-describes exports, snapshots them, and may auto-bump versions.
+- `savage check` simply ensures the requested feature configs exist before delegating export/import contract enforcement to the ESLint plugins (`npm run lint`).
 - `savage info` prints owners, dependencies, exports, routes, policies, and warns when contracts change.
 - `savage graph` renders dependency/reverse maps for architecture reviews.
 
 ## Routing
 
-- `featureRegistry` imports every `feature.config` + `routes.tsx`, wraps their routes with `FeatureRuntimeWrapper`, and groups them by prefix. Routes should be declared through `defineFeatureRoutes(featureName, definitions)` (see `src/core/routing/routeHelpers.ts`), so you describe the path name, `lazyImport`, and optional policies once and the helper wires handles, metadata, and telemetry automatically.
+- `featureRegistry` imports every `feature.config` + `routes.tsx`, wraps their routes with `FeatureRuntimeWrapper`, and groups them by prefix. Routes should be declared through `defineFeatureRoutes(featureName, definitions)` (see `src/core/routing/routeHelpers.ts`), so you describe the path name, `lazyImport`, and optional policies once and the helper wires handles plus the associated metadata defaults.
 - Each feature's `routes.tsx` exports a `routePrefix` string; the registry mounts the wrapped routes under that namespace (e.g., `routePrefix: "notification"` → `/notification/*`). Define absolute child paths (`path: "/info"`) to escape the prefix, or set `routePrefix: false` if the feature owns its entire set of paths.
 - The system auto-inserts a NotFound index route for any prefix that lacks an explicit index or empty path so visiting `/demo/` without a defined landing still renders the 404 view instead of a blank page. The same `NotFound` component is the global `*` fallback inside `src/routes/featureRoutes.tsx`.
 - Lazy loading is opt-out by default via `handle.lazyImport`. The default template sets `lazyImport: "./pages/{{featureName}}Page.tsx"`, so `featureRegistry` wraps that path with `React.lazy`/`Suspense`. You can opt out by setting `handle.skipLazy = true` or provide a static `element`.
@@ -103,10 +103,9 @@ All CLI commands live under the `savage` script (`tooling/savage/savage.mjs`). T
 
 ## Observability
 
-- `TelemetryGuard` automatically logs mount/unmount events with feature name, route name, route path, version, and policies.
-- Wrap `<App />` inside `TelemetryLoggerProvider` (already wired in `src/main.tsx`). Provide a custom logger to integrate with your telemetry stack or set `VITE_SAVAGE_TELEMETRY=false` to silence logs.
-- Use `useFeatureTelemetry()` inside feature pages to read the current feature/route metadata and decorate user-facing telemetry.
-- **Policy-driven middleware**: Every feature’s `policies` block (supported by the template and `feature.config`) is passed to `FeatureRuntimeWrapper`/`TelemetryGuard`, so you can treat values such as `auth: strong`, `cache: no-store`, or `telemetryContext: demo` as lightweight middleware hints. Guards and headers can read and honor the current `policies` at render time or via `useFeatureTelemetry()`; feel free to add `policies` to individual entries in `defineFeatureRoutes` when you need route-specific behavior.
+- The runtime no longer ships with a built-in telemetry guard; wrap your own logging, metrics, or tracing helpers around `FeatureRuntimeWrapper` when you need to capture feature lifecycle data.
+- `FeatureRuntimeWrapper` still propagates the `policies` metadata declared in `feature.config`, so components can read hints such as `auth` or `cache` to keep middleware consistent.
+- Export/import contracts are enforced via the ESLint rule `route-paths/no-cross-feature-imports` (run `npm run lint`). `npm run savage -- check` now just verifies that the requested feature configs exist before you run the lint rules.
 
 ## Diagnostics & Testing
 
@@ -125,4 +124,4 @@ All CLI commands live under the `savage` script (`tooling/savage/savage.mjs`). T
 
 ## Why Savage?
 
-This framework helps teams ship large React applications with isolated features, explicit contracts, and runtime helpers for routing, telemetry, testing, and dependency management. Let me know if you’d like a CLI spec, template walkthrough, or telemetry recommendation next.
+This framework helps teams ship large React applications with isolated features, explicit contracts, and runtime helpers for routing, instrumentation, testing, and dependency management. Let me know if you’d like a CLI spec or template walkthrough next.
